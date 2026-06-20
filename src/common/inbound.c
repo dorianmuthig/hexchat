@@ -1194,23 +1194,48 @@ check_autojoin_channels (server *serv)
 		list = list->next;
 	}
 
+	int reconnectingSession = 0;
+	GSList* reconnectList = NULL;
 	if (sess_channels)
 	{
+		reconnectingSession = 1;
 		serv->p_join_list (serv, sess_channels);
+		if (serv->favlist)
+		{
+			GSList* favorites = serv->favlist;
+			while (favorites)
+			{
+				if (g_slist_find(sess_channels, favorites->data) == NULL)
+				{
+					g_slist_append(reconnectList, favorites->data);
+				}
+
+				favorites = favorites->next;
+			}
+		}
 		g_slist_free_full (sess_channels, (GDestroyNotify) servlist_favchan_free);
 	}
-	else
-	{
+	//else
+	//{
 		/* If there's no session, just autojoin to favorites. */
 		if (serv->favlist)
 		{
-			serv->p_join_list (serv, serv->favlist);
+			if (reconnectingSession)
+			{
+				serv->p_join_list(serv, reconnectList);
+				g_slist_free_full(reconnectList, (GDestroyNotify)servlist_favchan_free);
+			}
+			else
+			{
+				serv->p_join_list(serv, serv->favlist);
+			}
+
 			i++;
 
 			/* FIXME this is not going to work and is not needed either. server_free() does the job already. */
 			/* g_slist_free_full (serv->favlist, (GDestroyNotify) servlist_favchan_free); */
 		}
-	}
+	//}
 
 	serv->joindelay_tag = 0;
 	fe_server_event (serv, FE_SE_LOGGEDIN, i);
