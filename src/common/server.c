@@ -133,8 +133,8 @@ tcp_send_queue (server *serv)
 	if (!is_server (serv))
 		return 0;
 
-	/* try priority 2,1,0 */
-	pri = 2;
+	/* try priority 3,2,1,0 */
+	pri = 3;
 	while (pri >= 0)
 	{
 		list = serv->outbound_queue;
@@ -169,6 +169,7 @@ tcp_send_queue (server *serv)
 				serv->outbound_queue = g_slist_remove (serv->outbound_queue, buf);
 				g_free (buf);
 				list = serv->outbound_queue;
+				return 1; // actually exit here, so we can be sure the command timeout is actually observed...
 			} else
 			{
 				list = list->next;
@@ -193,6 +194,14 @@ tcp_send_len (server *serv, char *buf, int len)
 	dbuf[0] = 2;	/* pri 2 for most things */
 	memcpy (dbuf + 1, buf, len);
 	dbuf[len + 1] = 0;
+
+	/* PING and PONG get highest priority (some servers disconnect you, and with the new channel join queue doing this in order takes too long) */
+
+	if (g_ascii_strncasecmp(dbuf + 1, "PING", 4) == 0 ||
+		g_ascii_strncasecmp(dbuf + 1, "PONG", 4) == 0)
+	{
+		dbuf[0] = 3;
+	}
 
 	/* privmsg and notice get a lower priority */
 	if (g_ascii_strncasecmp (dbuf + 1, "PRIVMSG", 7) == 0 ||
@@ -236,8 +245,12 @@ keep_priority:
 	serv->outbound_queue = g_slist_append (serv->outbound_queue, dbuf);
 	serv->sendq_len += len; /* tcp_send_queue uses strlen */
 
-	if (tcp_send_queue (serv) && noqueue)
-		fe_timeout_add (500, tcp_send_queue, serv);
+	//if (tcp_send_queue(serv) && noqueue)
+	if (noqueue) // let's make sure sending only happens through the timeout loop, and when the queue newly fills with something and not every time the method is called
+	{
+		tcp_send_queue(serv);
+		fe_timeout_add(533, tcp_send_queue, serv); // this is where the delay between individual IRC commands is?
+	}
 
 	return 1;
 }

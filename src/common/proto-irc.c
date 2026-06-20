@@ -147,6 +147,13 @@ irc_join_list_flush (server *serv, GString *channels, GString *keys, int send_ke
 	{
 		tcp_sendf (serv, "JOIN %s\r\n", chanstr);	/* send the actual command */
 	}
+	/*
+#ifdef WIN32
+	Sleep(1 * 1000);
+#else
+	sleep(1);
+#endif // WIN32
+	*/
 
 	g_free (chanstr);
 	g_free (keystr);
@@ -162,10 +169,13 @@ irc_join_list (server *serv, GSList *favorites)
 	int first_item = 1;										/* determine whether we add commas or not */
 	int send_keys = 0;										/* if none of our channels have keys, we can omit the 'x' fillers altogether */
 	int len = 9;											/* JOIN<space>channels<space>keys\r\n\0 */
+	int item_count = 0;
 	favchannel *fav;
 	GString *chanlist = g_string_new (NULL);
 	GString *keylist = g_string_new (NULL);
 	GSList *favlist;
+
+	//fe_timeout_add(5334, NULL, serv);
 
 	favlist = favorites;
 
@@ -178,49 +188,80 @@ irc_join_list (server *serv, GSList *favorites)
 		{
 			len += strlen (fav->key);
 		}
+		item_count++;
 
-		if (len >= 512)										/* command length exceeds the IRC hard limit, flush it and start from scratch */
+		session* sess_found = NULL;
+
+		if (strlen(fav->name) > 1)
 		{
-			irc_join_list_flush (serv, chanlist, keylist, send_keys);
+			GString* channel = g_string_new(NULL);
+			g_string_append(channel, fav->name);
+			sess_found = find_channel(serv, channel->str);
+			if (sess_found == NULL)
+			{
+				GString* key = g_string_new(NULL);
+				if (!fav->key)
+				{
+					//irc_join(serv, fav->name, NULL);
+					irc_join_list_flush(serv, channel, key, send_keys);
+					//cmd_join(serv->server_session, )
+				}
+				else
+				{
+					//irc_join(serv, fav->name, fav->key);
+					g_string_append(key, fav->key);
+					send_keys = 1;
+					irc_join_list_flush(serv, channel, key, send_keys);
+				}
+			}
+		}
 
-			chanlist = g_string_new (NULL);
-			keylist = g_string_new (NULL);
+		//if (len >= 512 || item_count >= 1)										/* command length exceeds the IRC hard limit, flush it and start from scratch */
+		//{
+		//	//serv->joindelay_tag = fe_timeout_add_seconds(prefs.hex_irc_join_delay, NULL, serv);
+		//
+		//  irc_join_list_flush(serv, chanlist, keylist, send_keys);
+		//
+		//	chanlist = g_string_new (NULL);
+		//	keylist = g_string_new (NULL);
 
 			len = 9;
 			first_item = 1;									/* list dumped, omit commas once again */
 			send_keys = 0;									/* also omit keys until we actually find one */
-		}
+			item_count = 0;
+		//}
 
-		if (!first_item)
-		{
-			/* This should be done before the length check, but channel names
-			 * are already at least 2 characters long so it would trigger the
-			 * flush anyway.
-			 */
-			len += 2;
+		//if (!first_item)
+		//{
+		//	/* This should be done before the length check, but channel names
+		//	 * are already at least 2 characters long so it would trigger the
+		//	 * flush anyway.
+		//	 */
+		//	len += 2;
 
-			/* add separators but only if it's not the 1st element */
-			g_string_append_c (chanlist, ',');
-			g_string_append_c (keylist, ',');
-		}
+		//	/* add separators but only if it's not the 1st element */
+		//	g_string_append_c (chanlist, ',');
+		//	g_string_append_c (keylist, ',');
+		//}
 
-		g_string_append (chanlist, fav->name);
+		//g_string_append (chanlist, fav->name);
 
-		if (fav->key)
-		{
-			g_string_append (keylist, fav->key);
-			send_keys = 1;
-		}
-		else
-		{
-			g_string_append_c (keylist, 'x');				/* 'x' filler for keyless channels so that our JOIN command is always well-formatted */
-		}
+		//if (fav->key)
+		//{
+		//	g_string_append (keylist, fav->key);
+		//	send_keys = 1;
+		//}
+		//else
+		//{
+		//	g_string_append_c (keylist, 'x');				/* 'x' filler for keyless channels so that our JOIN command is always well-formatted */
+		//}
 
-		first_item = 0;
+		//first_item = 0;
+
 		favlist = favlist->next;
 	}
 
-	irc_join_list_flush (serv, chanlist, keylist, send_keys);
+	//irc_join_list_flush (serv, chanlist, keylist, send_keys);
 	g_slist_free (favlist);
 }
 
