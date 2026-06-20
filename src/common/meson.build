@@ -15,6 +15,7 @@ common_sources = [
   'plugin-identd.c',
   'plugin-timer.c',
   'proto-irc.c',
+  'scram.c',
   'server.c',
   'servlist.c',
 	'text.c',
@@ -47,7 +48,6 @@ if host_machine.system() == 'windows'
   ]
   common_sysinfo_deps += [
     cc.find_library('wbemuuid'), # sysinfo
-    cc.find_library('wbemcore'),
   ]
 
   common_sources += 'sysinfo/win32/backend.c'

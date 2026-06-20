@@ -69,7 +69,16 @@ int fe_input_add (int sok, int flags, void *func, void *data);
 void fe_input_remove (int tag);
 void fe_idle_add (void *func, void *data);
 void fe_set_topic (struct session *sess, char *topic, char *stripped_topic);
-void fe_set_tab_color (struct session *sess, int col);
+typedef enum
+{
+	FE_COLOR_NONE = 0,
+	FE_COLOR_NEW_DATA = 1,
+	FE_COLOR_NEW_MSG = 2,
+	FE_COLOR_NEW_HILIGHT = 3,
+	FE_COLOR_FLAG_NOOVERRIDE = 8,
+} tabcolor;
+#define FE_COLOR_ALLFLAGS (FE_COLOR_FLAG_NOOVERRIDE)
+void fe_set_tab_color (struct session *sess, tabcolor col);
 void fe_flash_window (struct session *sess);
 void fe_update_mode_buttons (struct session *sess, char mode, char sign);
 void fe_update_channel_key (struct session *sess);
@@ -132,6 +141,7 @@ void fe_get_int (char *prompt, int def, void *callback, void *ud);
 #define FRF_NOASKOVERWRITE 32	/* don't ask to overwrite existing files */
 #define FRF_EXTENSIONS 64		/* specify file extensions to be displayed */
 #define FRF_MIMETYPES 128		/* specify file mimetypes to be displayed */
+#define FRF_MODAL 256           /* dialog should be modal to parent */
 void fe_get_file (const char *title, char *initial,
 				 void (*callback) (void *userdata, char *file), void *userdata,
 				 int flags);

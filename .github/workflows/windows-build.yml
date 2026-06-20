@@ -1,8 +1,14 @@
 name: Windows Build
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
 
 jobs:
-  build:
+  windows_build:
     runs-on: windows-2019
     strategy:
       matrix:
@@ -28,7 +34,7 @@ jobs:
           Invoke-WebRequest https://dl.hexchat.net/misc/idpsetup-1.5.1.exe -OutFile deps\idpsetup.exe
           & deps\idpsetup.exe /VERYSILENT
 
-          Invoke-WebRequest https://dl.hexchat.net/gtk/gtk-${{ matrix.platform }}-2018-08-29.7z -OutFile deps\gtk-${{ matrix.arch }}.7z
+          Invoke-WebRequest https://dl.hexchat.net/gtk/gtk-${{ matrix.platform }}-2018-08-29-openssl1.1.7z -OutFile deps\gtk-${{ matrix.arch }}.7z
           & 7z.exe x deps\gtk-${{ matrix.arch }}.7z -oC:\gtk-build\gtk
 
           Invoke-WebRequest https://dl.hexchat.net/gtk-win32/gendef-20111031.7z -OutFile deps\gendef.7z
@@ -40,13 +46,10 @@ jobs:
           Invoke-WebRequest https://dl.hexchat.net/misc/perl/perl-5.20.0-${{ matrix.arch }}.7z -OutFile deps\perl-${{ matrix.arch }}.7z
           & 7z.exe x deps\perl-${{ matrix.arch }}.7z -oC:\gtk-build\perl-5.20\${{ matrix.platform }}
 
-          New-Item -Path "c:\gtk-build" -Name "python-2.7" -ItemType "Directory"
-          New-Item -Path "c:\gtk-build" -Name "python-3.6" -ItemType "Directory"
-          New-Item -Path "c:\gtk-build\python-2.7" -Name "${{ matrix.platform }}" -ItemType "SymbolicLink" -Value "C:/hostedtoolcache/windows/Python/2.7.18/${{ matrix.arch }}"
-          New-Item -Path "c:\gtk-build\python-3.6" -Name "${{ matrix.platform }}" -ItemType "SymbolicLink" -Value "C:/hostedtoolcache/windows/Python/3.6.8/${{ matrix.arch }}"
+          New-Item -Path "c:\gtk-build" -Name "python-3.8" -ItemType "Directory"
+          New-Item -Path "c:\gtk-build\python-3.8" -Name "${{ matrix.platform }}" -ItemType "SymbolicLink" -Value "C:/hostedtoolcache/windows/Python/3.8.10/${{ matrix.arch }}"
 
-          C:/hostedtoolcache/windows/Python/3.6.8/${{ matrix.arch }}/python.exe -m pip install cffi
-          C:/hostedtoolcache/windows/Python/2.7.18/${{ matrix.arch }}/python.exe -m pip install -qq cffi
+          C:/hostedtoolcache/windows/Python/3.8.10/${{ matrix.arch }}/python.exe -m pip install cffi
         shell: powershell
 
       - name: Build

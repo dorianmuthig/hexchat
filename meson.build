@@ -1,5 +1,5 @@
 project('hexchat', 'c',
-  version: '2.14.3',
+  version: '2.16.2',
   meson_version: '>= 0.47.0',
   default_options: [
     'c_std=gnu89',
@@ -13,7 +13,7 @@ gnome = import('gnome')
 cc = meson.get_compiler('c')
 
 
-libgio_dep = dependency('gio-2.0', version: '>= 2.34.0')
+libgio_dep = dependency('gio-2.0', version: '>= 2.36.0')
 libgmodule_dep = dependency('gmodule-2.0')
 
 libcanberra_dep = dependency('libcanberra', version: '>= 0.22',
@@ -22,7 +22,7 @@ dbus_glib_dep = dependency('dbus-glib-1', required: get_option('dbus'))
 
 global_deps = []
 if cc.get_id() == 'msvc'
-  libssl_dep = cc.find_library('libeay32')
+  libssl_dep = cc.find_library('libssl')
 else
   libssl_dep = dependency('openssl', version: '>= 0.9.8',
                           required: get_option('tls'))
@@ -34,6 +34,7 @@ config_h.set_quoted('PACKAGE_NAME', meson.project_name())
 config_h.set_quoted('GETTEXT_PACKAGE', 'hexchat')
 config_h.set_quoted('LOCALEDIR', join_paths(get_option('prefix'),
                                  get_option('datadir'), 'locale'))
+config_h.set_quoted('G_LOG_DOMAIN', 'hexchat')
 config_h.set10('ENABLE_NLS', true)
 
 # Optional features
@@ -46,8 +47,8 @@ config_h.set('G_DISABLE_SINGLE_INCLUDES', true)
 config_h.set('GTK_DISABLE_DEPRECATED', true)
 config_h.set('GTK_DISABLE_SINGLE_INCLUDES', true)
 config_h.set('GDK_PIXBUF_DISABLE_SINGLE_INCLUDES', true)
-config_h.set('GLIB_VERSION_MAX_ALLOWED', 'GLIB_VERSION_2_34')
-config_h.set('GLIB_VERSION_MIN_REQUIRED', 'GLIB_VERSION_2_34')
+config_h.set('GLIB_VERSION_MAX_ALLOWED', 'GLIB_VERSION_2_36')
+config_h.set('GLIB_VERSION_MIN_REQUIRED', 'GLIB_VERSION_2_36')
 
 # Detected features
 config_h.set('HAVE_MEMRCHR', cc.has_function('memrchr'))

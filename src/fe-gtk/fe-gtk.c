@@ -664,13 +664,13 @@ fe_print_text (struct session *sess, char *text, time_t stamp,
 		return;
 
 	if (sess == current_tab)
-		fe_set_tab_color (sess, 0);
+		fe_set_tab_color (sess, FE_COLOR_NONE);
 	else if (sess->tab_state & TAB_STATE_NEW_HILIGHT)
-		fe_set_tab_color (sess, 3);
+		fe_set_tab_color (sess, FE_COLOR_NEW_HILIGHT);
 	else if (sess->tab_state & TAB_STATE_NEW_MSG)
-		fe_set_tab_color (sess, 2);
+		fe_set_tab_color (sess, FE_COLOR_NEW_MSG);
 	else
-		fe_set_tab_color (sess, 1);
+		fe_set_tab_color (sess, FE_COLOR_NEW_DATA);
 }
 
 void
@@ -903,7 +903,7 @@ fe_confirm (const char *message, void (*yesproc)(void *), void (*noproc)(void *)
 	if (dcc->file)
 	{
 		char *filepath = g_build_filename (prefs.hex_dcc_dir, dcc->file, NULL);
-		gtkutil_file_req (message, dcc_saveas_cb, ud, filepath, NULL,
+		gtkutil_file_req (NULL, message, dcc_saveas_cb, ud, filepath, NULL,
 								FRF_WRITE|FRF_NOASKOVERWRITE|FRF_FILTERISINITIAL);
 		g_free (filepath);
 	}
@@ -1054,6 +1054,45 @@ osx_show_uri (const char *url)
 
 #endif
 
+static inline char *
+escape_uri (const char *uri)
+{
+	return g_uri_escape_string(uri, G_URI_RESERVED_CHARS_GENERIC_DELIMITERS G_URI_RESERVED_CHARS_SUBCOMPONENT_DELIMITERS, FALSE);
+}
+
+static inline gboolean
+uri_contains_forbidden_characters (const char *uri)
+{
+	while (*uri)
+	{
+		if (!g_ascii_isalnum (*uri) && !strchr ("-._~:/?#[]@!$&'()*+,;=", *uri))
+			return TRUE;
+		uri++;
+	}
+
+	return FALSE;
+}
+
+static char *
+maybe_escape_uri (const char *uri)
+{
+	/* The only way to know if a string has already been escaped or not
+	 * is by fulling parsing each segement but we can try some more simple heuristics. */
+
+	/* If we find characters that should clearly be escaped. */
+	if (uri_contains_forbidden_characters (uri))
+		return escape_uri (uri);
+
+	/* If it fails to be unescaped then it was not escaped. */
+	char *unescaped = g_uri_unescape_string (uri, NULL);
+	if (!unescaped)
+		return escape_uri (uri);
+	g_free (unescaped);
+
+	/* At this point it is probably safe to pass through as-is. */
+	return g_strdup (uri);
+}
+
 static void
 fe_open_url_inner (const char *url)
 {
@@ -1071,8 +1110,8 @@ fe_open_url_inner (const char *url)
 #elif defined(__APPLE__)
     osx_show_uri (url);
 #else
-	char *escaped_url = g_uri_escape_string (url, G_URI_RESERVED_CHARS_GENERIC_DELIMITERS G_URI_RESERVED_CHARS_SUBCOMPONENT_DELIMITERS,
-	                                         FALSE);
+	char *escaped_url = maybe_escape_uri (url);
+	g_debug ("Opening URL \"%s\" (%s)", escaped_url, url);
 	gtk_show_uri (NULL, escaped_url, GDK_CURRENT_TIME, NULL);
 	g_free (escaped_url);
 #endif
@@ -1176,7 +1215,7 @@ fe_get_file (const char *title, char *initial,
 {
 	/* OK: Call callback once per file, then once more with file=NULL. */
 	/* CANCEL: Call callback once with file=NULL. */
-	gtkutil_file_req (title, callback, userdata, initial, NULL, flags | FRF_FILTERISINITIAL);
+	gtkutil_file_req (NULL, title, callback, userdata, initial, NULL, flags | FRF_FILTERISINITIAL);
 }
 
 void

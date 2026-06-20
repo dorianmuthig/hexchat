@@ -375,7 +375,7 @@ server_read (GIOChannel *source, GIOCondition condition, server *serv)
 				serv->linebuf[serv->pos] = lbuf[i];
 				if (serv->pos >= (sizeof (serv->linebuf) - 1))
 					fprintf (stderr,
-								"*** HEXCHAT WARNING: Buffer overflow - shit server!\n");
+								"*** HEXCHAT WARNING: Buffer overflow - non-compliant server!\n");
 				else
 					serv->pos++;
 			}
@@ -785,7 +785,7 @@ server_connect_success (server *serv)
 
 		/* it'll be a memory leak, if connection isn't terminated by
 		   server_cleanup() */
-		if ((err = _SSL_set_verify (serv->ctx, ssl_cb_verify, NULL)))
+		if ((err = _SSL_set_verify (serv->ctx, ssl_cb_verify)))
 		{
 			EMIT_SIGNAL (XP_TE_CONNFAIL, serv->server_session, err, NULL,
 							 NULL, NULL, 0);
@@ -1572,7 +1572,7 @@ server_connect (server *serv, char *hostname, int port, int no_login)
 	if (!hostname[0])
 		return;
 
-	if (port < 0)
+	if (port < 1 || port > 65535)
 	{
 		/* use default port for this server type */
 		port = 6667;
@@ -1580,8 +1580,8 @@ server_connect (server *serv, char *hostname, int port, int no_login)
 		if (serv->use_ssl)
 			port = 6697;
 #endif
+		g_debug ("Attempted to connect to invalid port, assuming default port %d", port);
 	}
-	port &= 0xffff;	/* wrap around */
 
 	if (serv->connected || serv->connecting || serv->recondelay_tag)
 		server_disconnect (sess, TRUE, -1);
@@ -1778,11 +1778,14 @@ server_set_defaults (server *serv)
 	g_free (serv->chanmodes);
 	g_free (serv->nick_prefixes);
 	g_free (serv->nick_modes);
-
+#ifdef USE_OPENSSL
+        g_clear_pointer (&serv->scram_session, scram_session_free);
+#endif
 	serv->chantypes = g_strdup ("#&!+");
 	serv->chanmodes = g_strdup ("beI,k,l");
 	serv->nick_prefixes = g_strdup ("@%+");
 	serv->nick_modes = g_strdup ("ohv");
+	serv->modes_per_line = 3; /* https://datatracker.ietf.org/doc/html/rfc1459#section-4.2.3.1 */
 	serv->sasl_mech = MECH_PLAIN;
 
 	if (!serv->encoding)
@@ -1791,6 +1794,7 @@ server_set_defaults (server *serv)
 	serv->nickcount = 1;
 	serv->end_of_motd = FALSE;
 	serv->sent_capend = FALSE;
+	serv->use_listargs = FALSE;
 	serv->is_away = FALSE;
 	serv->supports_watch = FALSE;
 	serv->supports_monitor = FALSE;
@@ -1948,6 +1952,8 @@ server_free (server *serv)
 #ifdef USE_OPENSSL
 	if (serv->ctx)
 		_SSL_context_free (serv->ctx);
+
+        g_clear_pointer (&serv->scram_session, scram_session_free);
 #endif
 
 	fe_server_callback (serv);

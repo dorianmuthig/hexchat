@@ -84,7 +84,8 @@ sysinfo_get_cpu_arch (void)
 
 	GetNativeSystemInfo (&si);
 
-	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64)
+	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ||
+		si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64)
 	{
 		return cpu_arch = 64;
 	}
@@ -106,7 +107,8 @@ sysinfo_get_build_arch (void)
 
 	GetSystemInfo (&si);
 
-	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64)
+	if (si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ||
+		si.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_ARM64)
 	{
 		return build_arch = 64;
 	}
@@ -353,6 +355,8 @@ static char *read_cpu_info (IWbemClassObject *object)
 	cpu_freq_mhz = max_clock_speed_variant.uintVal;
 
 	VariantClear (&max_clock_speed_variant);
+
+	g_strchomp (name_utf8);
 
 	if (cpu_freq_mhz > 1000)
 	{

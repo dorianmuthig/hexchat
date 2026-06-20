@@ -218,7 +218,7 @@ notification_plugin_init (hexchat_plugin *plugin_handle, char **plugin_name, cha
 	if (!notification_backend_init (&error))
 	{
 		if (error)
-			hexchat_printf(plugin_handle, "Failed loading notification plugin: %s\n", error);
+			g_debug("Failed loading notification plugin: %s\n", error);
 		return 0;
 	}
 
@@ -246,7 +246,7 @@ notification_plugin_init (hexchat_plugin *plugin_handle, char **plugin_name, cha
 
 
 int
-notification_plugin_deinit (void)
+notification_plugin_deinit (void *unused_param)
 {
 	notification_backend_deinit ();
 	return 1;

@@ -170,7 +170,8 @@ xtext_pango_attr (PangoAttribute *attr)
 static void
 xtext_pango_init (GtkXText *xtext)
 {
-	int i, j;
+	size_t i;
+	int j;
 	char buf[2] = "\000";
 
 	if (attr_lists[0])
@@ -947,7 +948,7 @@ gtk_xtext_find_char (GtkXText * xtext, int x, int y, int *off, int *out_of_bound
 	textentry *ent;
 	int line;
 	int subline;
-	int outofbounds;
+	int outofbounds = FALSE;
 
 	/* Adjust y value for negative rounding, double to int */
 	if (y < 0)

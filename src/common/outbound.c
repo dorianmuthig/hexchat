@@ -468,7 +468,7 @@ create_mask (session * sess, char *mask, char *mode, char *typestr, int deop)
 			type = prefs.hex_irc_ban_type;
 
 		buf[0] = 0;
-		if (inet_addr (fullhost) != -1)	/* "fullhost" is really a IP number */
+		if (inet_addr (fullhost) != (guint32) -1)	/* "fullhost" is really a IP number */
 		{
 			lastdot = strrchr (fullhost, '.');
 			if (!lastdot)
@@ -1579,9 +1579,26 @@ cmd_execw (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 		EMIT_SIGNAL (XP_TE_NOCHILD, sess, NULL, NULL, NULL, NULL, 0);
 		return FALSE;
 	}
-	len = strlen(word_eol[2]);
-	temp = g_strconcat (word_eol[2], "\n", NULL);
-	PrintText(sess, temp);
+	if (strcmp (word[2], "--") == 0)
+	{
+		len = strlen(word_eol[3]);
+		temp = g_strconcat (word_eol[3], "\n", NULL);
+		PrintText(sess, temp);
+	}
+	else
+	{
+		if (strcmp (word[2], "-q") == 0)
+		{
+			len = strlen(word_eol[3]);
+			temp = g_strconcat (word_eol[3], "\n", NULL);
+		}
+		else
+		{
+			len = strlen(word_eol[2]);
+			temp = g_strconcat (word_eol[2], "\n", NULL);
+			PrintText(sess, temp);
+		}
+	}
 	write(sess->running_exec->myfd, temp, len + 1);
 	g_free(temp);
 
@@ -2152,7 +2169,6 @@ cmd_gui (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 	{
 	case 0x058b836e: fe_ctrl_gui (sess, 8, 0); break; /* APPLY */
 	case 0xac1eee45: fe_ctrl_gui (sess, 7, 2); break; /* ATTACH */
-	case 0x05a72f63: fe_ctrl_gui (sess, 4, atoi (word[3])); break; /* COLOR */
 	case 0xb06a1793: fe_ctrl_gui (sess, 7, 1); break; /* DETACH */
 	case 0x05cfeff0: fe_ctrl_gui (sess, 3, 0); break; /* FLASH */
 	case 0x05d154d8: fe_ctrl_gui (sess, 2, 0); break; /* FOCUS */
@@ -2165,6 +2181,12 @@ cmd_gui (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 			fe_ctrl_gui (sess, 6, 0);
 		else
 			return FALSE;
+		break;
+	case 0x05a72f63: /* COLOR */
+		if (!g_ascii_strcasecmp (word[4], "-NOOVERRIDE"))
+			fe_ctrl_gui (sess, 4, FE_COLOR_FLAG_NOOVERRIDE | atoi (word[3]));
+		else
+			fe_ctrl_gui (sess, 4, atoi (word[3]));
 		break;
 	default:
 		return FALSE;
@@ -3227,7 +3249,7 @@ cmd_reconnect (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 		int offset = 0;
 
 #ifdef USE_OPENSSL
-		int use_ssl = FALSE;
+		int use_ssl = TRUE;
 		int use_ssl_noverify = FALSE;
 		if (g_strcmp0 (word[2], "-ssl") == 0)
 		{
@@ -3238,6 +3260,11 @@ cmd_reconnect (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 		{
 			use_ssl = TRUE;
 			use_ssl_noverify = TRUE;
+			offset++;	/* args move up by 1 word */
+		} else if (g_strcmp0 (word[2], "-insecure") == 0)
+		{
+			use_ssl = FALSE;
+			use_ssl_noverify = FALSE;
 			offset++;	/* args move up by 1 word */
 		}
 		serv->use_ssl = use_ssl;
@@ -3428,8 +3455,12 @@ cmd_server (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 	char *pass = NULL;
 	char *channel = NULL;
 	char *key = NULL;
-	int use_ssl = FALSE;
+#ifdef USE_OPENSSL
+	int use_ssl = TRUE;
 	int use_ssl_noverify = FALSE;
+#else
+	int use_ssl = FALSE;
+#endif
 	int is_url = TRUE;
 	server *serv = sess->server;
 	ircnet *net = NULL;
@@ -3445,6 +3476,11 @@ cmd_server (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 	{
 		use_ssl = TRUE;
 		use_ssl_noverify = TRUE;
+		offset++;	/* args move up by 1 word */
+	}
+	else if (g_strcmp0 (word[2], "-insecure") == 0)
+	{
+		use_ssl = FALSE;
 		offset++;	/* args move up by 1 word */
 	}
 #endif
@@ -3485,6 +3521,13 @@ cmd_server (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 		port++;
 #ifdef USE_OPENSSL
 		use_ssl = TRUE;
+#endif
+	}
+	else if (port[0] == '-')
+	{
+		port++;
+#ifdef USE_OPENSSL
+		use_ssl = FALSE;
 #endif
 	}
 
@@ -3542,7 +3585,7 @@ cmd_servchan (struct session *sess, char *tbuf, char *word[],
 	int offset = 0;
 
 #ifdef USE_OPENSSL
-	if (g_strcmp0 (word[2], "-ssl") == 0 || g_strcmp0 (word[2], "-ssl-noverify") == 0)
+	if (g_strcmp0 (word[2], "-ssl") == 0 || g_strcmp0 (word[2], "-ssl-noverify") == 0 || g_strcmp0 (word[2], "-insecure") == 0)
 		offset++;
 #endif
 
@@ -3877,34 +3920,6 @@ cmd_wallchop (struct session *sess, char *tbuf, char *word[],
 }
 
 static int
-cmd_wallchan (struct session *sess, char *tbuf, char *word[],
-				  char *word_eol[])
-{
-	GSList *list;
-
-	if (*word_eol[2])
-	{
-		list = sess_list;
-		while (list)
-		{
-			sess = list->data;
-			if (sess->type == SESS_CHANNEL)
-			{
-				message_tags_data no_tags = MESSAGE_TAGS_DATA_INIT;
-
-				inbound_chanmsg (sess->server, NULL, sess->channel,
-									  sess->server->nick, word_eol[2], TRUE, FALSE, 
-									  &no_tags);
-				sess->server->p_message (sess->server, sess->channel, word_eol[2]);
-			}
-			list = list->next;
-		}
-		return TRUE;
-	}
-	return FALSE;
-}
-
-static int
 cmd_hop (struct session *sess, char *tbuf, char *word[], char *word_eol[])
 {
 	int i = 2;
@@ -4000,7 +4015,7 @@ const struct commands xc_cmds[] = {
 	 N_("EXECKILL [-9], kills a running exec in the current session. If -9 is given the process is SIGKILL'ed")},
 #ifndef __EMX__
 	{"EXECSTOP", cmd_execs, 0, 0, 1, N_("EXECSTOP, sends the process SIGSTOP")},
-	{"EXECWRITE", cmd_execw, 0, 0, 1, N_("EXECWRITE, sends data to the processes stdin")},
+	{"EXECWRITE", cmd_execw, 0, 0, 1, N_("EXECWRITE [-q|--], sends data to the processes stdin; use -q flag to quiet/suppress output at text box; use -- flag to stop interpreting arguments as flags, needed if -q itself would occur as data")},
 #endif
 #endif
 #if 0
@@ -4015,8 +4030,9 @@ const struct commands xc_cmds[] = {
 	{"GETINT", cmd_getint, 0, 0, 1, "GETINT <default> <command> <prompt>"},
 	{"GETSTR", cmd_getstr, 0, 0, 1, "GETSTR <default> <command> <prompt>"},
 	{"GHOST", cmd_ghost, 1, 0, 1, N_("GHOST <nick> [password], Kills a ghosted nickname")},
-	{"GUI", cmd_gui, 0, 0, 1, "GUI [APPLY|ATTACH|DETACH|SHOW|HIDE|FOCUS|FLASH|ICONIFY|COLOR <n>]\n"
-									  "       GUI [MSGBOX <text>|MENU TOGGLE]"},
+	{"GUI", cmd_gui, 0, 0, 1, "GUI [APPLY|ATTACH|DETACH|SHOW|HIDE|FOCUS|FLASH|ICONIFY]\n"
+									  "       GUI [MSGBOX <text>|MENU TOGGLE]\n"
+									  "       GUI COLOR <n> [-NOOVERRIDE]"},
 	{"HELP", cmd_help, 0, 0, 1, 0},
 	{"HOP", cmd_hop, 1, 1, 1,
 	 N_("HOP <nick>, gives chanhalf-op status to the nick (needs chanop)")},
@@ -4103,14 +4119,14 @@ const struct commands xc_cmds[] = {
 	{"SEND", cmd_send, 0, 0, 1, N_("SEND <nick> [<file>]")},
 #ifdef USE_OPENSSL
 	{"SERVCHAN", cmd_servchan, 0, 0, 1,
-	 N_("SERVCHAN [-ssl|-ssl-noverify] <host> <port> <channel>, connects and joins a channel")},
+	 N_("SERVCHAN [-insecure|-ssl|-ssl-noverify] <host> <port> <channel>, connects and joins a channel using ssl unless otherwise specified")},
 #else
 	{"SERVCHAN", cmd_servchan, 0, 0, 1,
 	 N_("SERVCHAN <host> <port> <channel>, connects and joins a channel")},
 #endif
 #ifdef USE_OPENSSL
 	{"SERVER", cmd_server, 0, 0, 1,
-	 N_("SERVER [-ssl|-ssl-noverify] <host> [<port>] [<password>], connects to a server, the default port is 6667 for normal connections, and 6697 for ssl connections")},
+	 N_("SERVER [-insecure|-ssl|-ssl-noverify] <host> [<port>] [<password>], connects to a server using ssl unless otherwise specified, the default port is 6697 for ssl connections and 6667 for insecure connections")},
 #else
 	{"SERVER", cmd_server, 0, 0, 1,
 	 N_("SERVER <host> [<port>] [<password>], connects to a server, the default port is 6667")},
@@ -4141,8 +4157,6 @@ const struct commands xc_cmds[] = {
 	{"USERLIST", cmd_userlist, 1, 1, 1, 0},
 	{"VOICE", cmd_voice, 1, 1, 1,
 	 N_("VOICE <nick>, gives voice status to someone (needs chanop)")},
-	{"WALLCHAN", cmd_wallchan, 1, 1, 1,
-	 N_("WALLCHAN <message>, writes the message to all channels")},
 	{"WALLCHOP", cmd_wallchop, 1, 1, 1,
 	 N_("WALLCHOP <message>, sends the message to all chanops on the current channel")},
 	{0, 0, 0, 0, 0, 0}

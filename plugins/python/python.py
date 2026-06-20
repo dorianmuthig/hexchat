@@ -64,6 +64,10 @@ class Stdout:
         else:
             self.buffer += string
 
+    def flush(self):
+        lib.hexchat_print(lib.ph, bytes(self.buffer))
+        self.buffer = bytearray()
+
     def isatty(self):
         return False
 
@@ -146,8 +150,8 @@ class Plugin:
     def loadfile(self, filename):
         try:
             self.filename = filename
-            with open(filename) as f:
-                data = f.read()
+            with open(filename, 'rb') as f:
+                data = f.read().decode('utf-8')
             compiled = compile_file(data, filename)
             exec(compiled, self.globals)
 
@@ -284,10 +288,18 @@ def _on_server_attrs_hook(word, word_eol, attrs, userdata):
 @ffi.def_extern()
 def _on_timer_hook(userdata):
     hook = ffi.from_handle(userdata)
-    if hook.callback(hook.userdata) is True:
+    if hook.callback(hook.userdata) == True:
         return 1
 
-    hook.is_unload = True  # Don't unhook
+    try:
+        # Avoid calling hexchat_unhook twice if unnecessary
+        hook.is_unload = True
+    except ReferenceError:
+        # hook is a weak reference, it might have been destroyed by the callback
+        # in which case it has already been removed from hook.plugin.hooks and
+        # we wouldn't be able to test it with h == hook anyway.
+        return 0
+
     for h in hook.plugin.hooks:
         if h == hook:
             hook.plugin.hooks.remove(h)

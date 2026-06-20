@@ -502,7 +502,7 @@ channel_date (session *sess, char *chan, char *timestr,
 }
 
 static int
-trailing_index(const char *word_eol[])
+trailing_index(char *word_eol[])
 {
 	int param_index;
 	for (param_index = 3; param_index < PDIWORDS; ++param_index)
@@ -542,22 +542,6 @@ process_numeric (session * sess, int n,
 				inbound_foundip (sess, strrchr(word[10], '@')+1, tags_data);
 		}
 
-		goto def;
-
-	case 4:	/* check the ircd type */
-		serv->use_listargs = FALSE;
-		serv->modes_per_line = 3;		/* default to IRC RFC */
-		if (strncmp (word[5], "bahamut", 7) == 0)				/* DALNet */
-		{
-			serv->use_listargs = TRUE;		/* use the /list args */
-		} else if (strncmp (word[5], "u2.10.", 6) == 0)		/* Undernet */
-		{
-			serv->use_listargs = TRUE;		/* use the /list args */
-			serv->modes_per_line = 6;		/* allow 6 modes per line */
-		} else if (strncmp (word[5], "glx2", 4) == 0)
-		{
-			serv->use_listargs = TRUE;		/* use the /list args */
-		}
 		goto def;
 
 	case 5:
@@ -684,7 +668,7 @@ process_numeric (session * sess, int n,
 	case 320:	/* :is an identified user */
 		if (!serv->skip_next_whois)
 			EMIT_SIGNAL_TIMESTAMP (XP_TE_WHOIS_ID, whois_sess, word[4],
-										  word_eol[5] + 1, NULL, NULL, 0,
+										  word_eol[5][0] == ':' ? word_eol[5] + 1 : word_eol[5], NULL, NULL, 0,
 										  tags_data->timestamp);
 		break;
 
@@ -975,6 +959,14 @@ process_numeric (session * sess, int n,
 	case 600:
 	case 604:
 		notify_set_online (serv, word[4], tags_data);
+		break;
+
+	case 524: // ERR_HELPNOTFOUND
+	case 704: // RPL_HELPSTART
+	case 705: // RPL_HELPTXT
+	case 706: // RPL_ENDOFHELP
+		EMIT_SIGNAL_TIMESTAMP (XP_TE_SERVTEXT, sess, STRIP_COLON(word, word_eol, 5), NULL, NULL, NULL,
+									  0, tags_data->timestamp);
 		break;
 
 	case 728:	/* +q-list entry */
