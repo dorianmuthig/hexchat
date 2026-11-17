@@ -231,7 +231,7 @@ tcp_send_len (server *serv, char *buf, int len)
 				/* look for +/- within the mode string */
 				loc = strchr (mode_str, '-');
 				if (loc && (!mode_str_end || loc < mode_str_end))
-					goto keep_priority;
+					goto keep_priority; //ew a goto...
 				loc = strchr (mode_str, '+');
 				if (loc && (!mode_str_end || loc < mode_str_end))
 					goto keep_priority;
